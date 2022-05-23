@@ -1,17 +1,10 @@
-
-/*************************************************************************
-This is an example of how to prepare a function JIT compile it and call it.
-Here is the equavalent function we willbe creating.
-
-int add(int X, int Y)
-{
-    auto  val =  X + Y;
-    return val;
-}
-**************************************************************************/
-
 #include <iostream>
 #include <memory>
+
+#include "antlr4-runtime.h"
+#include "parser/grootLexer.h"
+#include "parser/grootParser.h"
+#include "visitorimpl.h"
 
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/Function.h"
@@ -19,6 +12,7 @@ int add(int X, int Y)
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetSelect.h"
 
+using namespace antlr4;
 using namespace llvm;
 using namespace llvm::orc;
 
@@ -26,6 +20,15 @@ ExitOnError check;
 
 int main(int argc, char *argv[])
 {
+    std::ifstream stream;
+    stream.open(argv[1]);
+    ANTLRInputStream input(stream);
+    grootLexer lexer(&input);
+    CommonTokenStream tokens(&lexer);
+    grootParser parser(&tokens);
+
+    tree::ParseTree *tree = parser.program();
+
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
 
@@ -35,20 +38,24 @@ int main(int argc, char *argv[])
 
     // 2. Create function header/prototype
     auto intType = Type::getInt32Ty(*context);
-    auto funPrototype = FunctionType::get(intType, {intType, intType}, false);
+    auto funPrototype = FunctionType::get(intType, {}, false);
     auto addFunction = Function::Create(funPrototype, Function::ExternalLinkage, "add", module.get());
 
     // 3. Extract the function parameters to be used with instructions
-    auto argX = &*addFunction->arg_begin();
-    auto argY = argX++;
+    //auto argX = &*addFunction->arg_begin();
+    //auto argY = argX++;
 
     // 4. Create function body block structure
     auto block = BasicBlock::Create(*context, "addFuncBlock", addFunction);
 
     // 5. Create instructions for the block
     IRBuilder<> builder(block);
-    auto val = builder.CreateAdd(argX, argY);
-    builder.CreateRet(val);
+
+
+    std::unique_ptr<grootVisitor> v = std::make_unique<visitor_impl>(context.get(), &builder);
+
+    auto result = v->visit(tree); 
+
 
     auto tsmodule = ThreadSafeModule(std::move(module), std::move(context));
 
@@ -58,10 +65,10 @@ int main(int argc, char *argv[])
 
     // 7. Lookup the prepared  function
     auto addFunSym = check(jitc->lookup("add"));
-    auto addFunc = (int (*)(int, int))addFunSym.getAddress();
+    auto addFunc = (int (*)())addFunSym.getAddress();
 
     // 8. Call the function
-    int meaning = addFunc(40, 2);
+    int meaning = addFunc();
 
     std::cout << "Meaning of life = " << meaning << std::endl;
     return 0;
