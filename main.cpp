@@ -39,23 +39,23 @@ int main(int argc, char *argv[])
     // 2. Create function header/prototype
     auto intType = Type::getInt32Ty(*context);
     auto funPrototype = FunctionType::get(intType, {}, false);
-    auto addFunction = Function::Create(funPrototype, Function::ExternalLinkage, "add", module.get());
+    auto mainFunction = Function::Create(funPrototype, Function::ExternalLinkage, "main", module.get());
 
     // 3. Extract the function parameters to be used with instructions
-    //auto argX = &*addFunction->arg_begin();
+    //auto argX = &*mainFunction->arg_begin();
     //auto argY = argX++;
 
     // 4. Create function body block structure
-    auto block = BasicBlock::Create(*context, "addFuncBlock", addFunction);
+    auto block = BasicBlock::Create(*context, "mainFuncBlock", mainFunction);
 
     // 5. Create instructions for the block
     IRBuilder<> builder(block);
 
-
-    std::unique_ptr<grootVisitor> v = std::make_unique<visitor_impl>(context.get(), &builder);
+    std::unique_ptr<grootVisitor> v = std::make_unique<visitor_impl>(context.get(), mainFunction, &builder);
 
     auto result = v->visit(tree); 
 
+    // module->print(errs(), nullptr);
 
     auto tsmodule = ThreadSafeModule(std::move(module), std::move(context));
 
@@ -64,12 +64,12 @@ int main(int argc, char *argv[])
     check(jitc->addIRModule(std::move(tsmodule)));
 
     // 7. Lookup the prepared  function
-    auto addFunSym = check(jitc->lookup("add"));
-    auto addFunc = (int (*)())addFunSym.getAddress();
+    auto mainFunSym = check(jitc->lookup("main"));
+    auto mainFunc = (int (*)())mainFunSym.getAddress();
 
     // 8. Call the function
-    int meaning = addFunc();
-
-    std::cout << "Meaning of life = " << meaning << std::endl;
+    int retVal = mainFunc();
+    std::cout << "Result " << retVal << std::endl;
+    
     return 0;
 }
