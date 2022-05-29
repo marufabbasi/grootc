@@ -11,7 +11,7 @@
 class visitor_impl : public grootBaseVisitor
 {
 public:
-    visitor_impl(llvm::LLVMContext *context, llvm::Function *fun, llvm::IRBuilder<> *builder);
+    visitor_impl(llvm::LLVMContext *context, llvm::Module *module);
 
     antlrcpp::Any visitPrimitiveExpression(grootParser::PrimitiveExpressionContext *ctx) override;
     antlrcpp::Any visitMulDivExpression(grootParser::MulDivExpressionContext *ctx) override;
@@ -20,6 +20,8 @@ public:
     antlrcpp::Any visitReturnStatement(grootParser::ReturnStatementContext *ctx) override;
     antlrcpp::Any visitVariableAssignment(grootParser::VariableAssignmentContext *ctx) override;
     antlrcpp::Any visitVariableValueExpression(grootParser::VariableValueExpressionContext *ctx) override;
+
+    antlrcpp::Any visitFunctionDefStatement(grootParser::FunctionDefStatementContext *ctx) override;
 
 protected:
     llvm::AllocaInst* allocateVariable(const std::string &VarName, llvm::Type *varType);
@@ -30,6 +32,10 @@ private:
     llvm::Function *fun_;
 
     std::map<std::string, llvm::AllocaInst*> scope_;
+
+    llvm::BasicBlock *block_temp_; // temporary block - should be managed using a scope class
+
+    llvm::Module *module_;
 };
 
 #endif

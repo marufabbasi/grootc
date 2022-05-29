@@ -1,12 +1,16 @@
 grammar groot;
 
-program: (statement)* EOF;
+program: (functionDefStatement)* EOF;
 
 statement: expression EOL
         | returnStatement EOL
         ;
 
 returnStatement: 'return' expr=expression;
+
+functionDefStatement: 'function' name=IDENTIFIER '(' (IDENTIFIER (',' IDENTIFIER)*)? ')' (EOL| blk=block);
+
+block: '{' (statement)* '}';
 
 expression: left=expression op=('*' | '/') right=expression         #mulDivExpression
             | left=expression op=('+' | '-') right=expression       #addSubExpression

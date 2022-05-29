@@ -36,22 +36,7 @@ int main(int argc, char *argv[])
     auto context = std::make_unique<LLVMContext>();
     auto module = std::make_unique<Module>("hg2galaxy", *context);
 
-    // 2. Create function header/prototype
-    auto intType = Type::getInt32Ty(*context);
-    auto funPrototype = FunctionType::get(intType, {}, false);
-    auto mainFunction = Function::Create(funPrototype, Function::ExternalLinkage, "main", module.get());
-
-    // 3. Extract the function parameters to be used with instructions
-    //auto argX = &*mainFunction->arg_begin();
-    //auto argY = argX++;
-
-    // 4. Create function body block structure
-    auto block = BasicBlock::Create(*context, "mainFuncBlock", mainFunction);
-
-    // 5. Create instructions for the block
-    IRBuilder<> builder(block);
-
-    std::unique_ptr<grootVisitor> v = std::make_unique<visitor_impl>(context.get(), mainFunction, &builder);
+    std::unique_ptr<grootVisitor> v = std::make_unique<visitor_impl>(context.get(), module.get());
 
     auto result = v->visit(tree); 
 

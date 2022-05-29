@@ -20,12 +20,11 @@
 
 #include "visitorimpl.h"
 
-visitor_impl::visitor_impl(llvm::LLVMContext *context, llvm::Function *fun, llvm::IRBuilder<> *builder)
+visitor_impl::visitor_impl(llvm::LLVMContext *context, llvm::Module *module)
 {
-    assert(context && fun && builder);
-    builder_ = builder;
+    assert(context && module);
     context_ = context;
-    fun_ = fun;
+    module_ = module;
 }
 
 antlrcpp::Any visitor_impl::visitMulDivExpression(grootParser::MulDivExpressionContext *ctx)
@@ -33,8 +32,8 @@ antlrcpp::Any visitor_impl::visitMulDivExpression(grootParser::MulDivExpressionC
     auto op = ctx->op->getText();
     assert(!op.empty());
 
-    auto left = visit(ctx->left).as<llvm::Value*>();
-    auto right = visit(ctx->right).as<llvm::Value*>();
+    auto left = visit(ctx->left).as<llvm::Value *>();
+    auto right = visit(ctx->right).as<llvm::Value *>();
 
     switch (op[0])
     {
@@ -52,8 +51,8 @@ antlrcpp::Any visitor_impl::visitAddSubExpression(grootParser::AddSubExpressionC
     auto op = ctx->op->getText();
     assert(!op.empty());
 
-    auto left = visit(ctx->left).as<llvm::Value*>();
-    auto right = visit(ctx->right).as<llvm::Value*>();
+    auto left = visit(ctx->left).as<llvm::Value *>();
+    auto right = visit(ctx->right).as<llvm::Value *>();
 
     switch (op[0])
     {
@@ -69,26 +68,26 @@ antlrcpp::Any visitor_impl::visitAddSubExpression(grootParser::AddSubExpressionC
 antlrcpp::Any visitor_impl::visitPrimitiveExpression(grootParser::PrimitiveExpressionContext *ctx)
 {
     auto val = std::stoi(ctx->atom->getText());
-    return (llvm::Value*) (llvm::ConstantInt::get(*context_, llvm::APInt(64, val)));
+    return (llvm::Value *)(llvm::ConstantInt::get(*context_, llvm::APInt(64, val)));
 }
 
 antlrcpp::Any visitor_impl::visitReturnStatement(grootParser::ReturnStatementContext *ctx)
 {
-    auto result = visit(ctx->expr).as<llvm::Value*>();
+    auto result = visit(ctx->expr).as<llvm::Value *>();
     return builder_->CreateRet(result);
 }
 
-antlrcpp::Any visitor_impl::visitVariableAssignment(grootParser::VariableAssignmentContext *ctx) 
+antlrcpp::Any visitor_impl::visitVariableAssignment(grootParser::VariableAssignmentContext *ctx)
 {
-    auto val  = visit(ctx->expr).as<llvm::Value*>();
+    auto val = visit(ctx->expr).as<llvm::Value *>();
     auto varName = ctx->var_name->getText();
     auto varType = llvm::Type::getInt64Ty(*context_);
     auto alloca = allocateVariable(varName, varType);
-    
+
     scope_[varName] = alloca;
 
-    return (llvm::StoreInst*) builder_->CreateStore(val, alloca, false);
-    //return builder_->CreateLoad(val->getType(), alloca, varName.c_str());
+    return (llvm::StoreInst *)builder_->CreateStore(val, alloca, false);
+    // return builder_->CreateLoad(val->getType(), alloca, varName.c_str());
 }
 
 antlrcpp::Any visitor_impl::visitVariableValueExpression(grootParser::VariableValueExpressionContext *ctx)
@@ -96,12 +95,38 @@ antlrcpp::Any visitor_impl::visitVariableValueExpression(grootParser::VariableVa
     auto varName = ctx->name->getText();
     auto alloca = scope_[varName];
     auto varType = llvm::Type::getInt64Ty(*context_);
-    
-    return (llvm::Value*) builder_->CreateLoad(varType, alloca, varName.c_str());
+
+    return (llvm::Value *)builder_->CreateLoad(varType, alloca, varName.c_str());
 }
 
-llvm::AllocaInst *visitor_impl::allocateVariable(const std::string &varName, llvm::Type *varType) 
+antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefStatementContext *ctx)
 {
-  llvm::IRBuilder<> bld(&fun_->getEntryBlock(), fun_->getEntryBlock().begin());
-  return bld.CreateAlloca(varType, 0, varName.c_str());
+    // @TODO: Creation of unique pointers in this class causes issues with ths LLVM internal memory mangement
+    // we will probably need to cleanup LLVM first before this class go out of scope. 
+    // For now we are alocating the memort and let it leak.
+
+    auto fname = ctx->name->getText();
+
+    auto intType = llvm::Type::getInt32Ty(*context_);
+    auto funPrototype = llvm::FunctionType::get(intType, {}, false);
+    fun_ = llvm::Function::Create(funPrototype, llvm::Function::ExternalLinkage, fname, module_);
+
+    // 3. Extract the function parameters to be used with instructions - @TODO
+
+    // 4. Create function body block structure
+    block_temp_ = llvm::BasicBlock::Create(*context_, fname + "Block", fun_);
+
+    // 5. Create instructions for the block
+    builder_ = new llvm::IRBuilder<>(block_temp_);
+
+    return visit(ctx->blk);
+}
+
+// Helper functions
+
+llvm::AllocaInst *visitor_impl::allocateVariable(const std::string &varName, llvm::Type *varType)
+{
+    assert(fun_ != nullptr);
+    llvm::IRBuilder<> bld(&fun_->getEntryBlock(), fun_->getEntryBlock().begin());
+    return bld.CreateAlloca(varType, 0, varName.c_str());
 }
