@@ -102,24 +102,50 @@ antlrcpp::Any visitor_impl::visitVariableValueExpression(grootParser::VariableVa
 antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefStatementContext *ctx)
 {
     // @TODO: Creation of unique pointers in this class causes issues with ths LLVM internal memory mangement
-    // we will probably need to cleanup LLVM first before this class go out of scope. 
-    // For now we are alocating the memort and let it leak.
+    // we will probably need to cleanup LLVM first before this class go out of scope.
+    // For now we are alocating the memory and deleting it.
 
     auto fname = ctx->name->getText();
 
+    // 3. Extract the function parameters to be used with instructions
+    std::vector<llvm::Type *> parameters;
+    std::vector<std::string> param_names;
+
+    int parts = ctx->children.size();
+    auto first_param_index = 3;
+    auto last_param_index = parts - 2;
+
+    for (int c = first_param_index; c < last_param_index; c += 2)
+    {
+        auto ptype = llvm::Type::getInt32Ty(*context_);
+        param_names.push_back(ctx->children[c]->getText());
+        parameters.push_back(ptype);
+    }
+
     auto intType = llvm::Type::getInt32Ty(*context_);
-    auto funPrototype = llvm::FunctionType::get(intType, {}, false);
+    auto funPrototype = llvm::FunctionType::get(intType, parameters, false);
     fun_ = llvm::Function::Create(funPrototype, llvm::Function::ExternalLinkage, fname, module_);
 
-    // 3. Extract the function parameters to be used with instructions - @TODO
+    // Set parameter names
+    int i = 0;
+    for (llvm::Function::arg_iterator a = fun_->arg_begin(), ae = fun_->arg_end(); a != ae; ++a, i++)    
+    {
+        a->setName(param_names[i]);
+    }
 
     // 4. Create function body block structure
-    block_temp_ = llvm::BasicBlock::Create(*context_, fname + "Block", fun_);
+    auto block_temp = llvm::BasicBlock::Create(*context_, fname + "Block", fun_);
 
     // 5. Create instructions for the block
-    builder_ = new llvm::IRBuilder<>(block_temp_);
+    llvm::IRBuilder<> builder(block_temp);
+    builder_ = &builder;
 
     return visit(ctx->blk);
+
+    builder_ = nullptr;
+    delete block_temp;
+    delete fun_;
+    fun_ = nullptr;
 }
 
 // Helper functions

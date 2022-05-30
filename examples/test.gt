@@ -1,4 +1,4 @@
-function main()
+function main(argc, argv)
 {
     x = 523-234+11-100*2/10;
     y = x + 1;

@@ -50,10 +50,10 @@ int main(int argc, char *argv[])
 
     // 7. Lookup the prepared  function
     auto mainFunSym = check(jitc->lookup("main"));
-    auto mainFunc = (int (*)())mainFunSym.getAddress();
+    auto mainFunc = (int (*)(int, int))mainFunSym.getAddress();
 
     // 8. Call the function
-    int retVal = mainFunc();
+    int retVal = mainFunc(1, 2);
     std::cout << "Result " << retVal << std::endl;
     
     return 0;

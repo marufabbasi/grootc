@@ -32,9 +32,7 @@ private:
     llvm::Function *fun_;
 
     std::map<std::string, llvm::AllocaInst*> scope_;
-
-    llvm::BasicBlock *block_temp_; // temporary block - should be managed using a scope class
-
+    
     llvm::Module *module_;
 };
 
