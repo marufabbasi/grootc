@@ -103,7 +103,7 @@ antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefSt
 {
     // @TODO: Creation of unique pointers in this class causes issues with ths LLVM internal memory mangement
     // we will probably need to cleanup LLVM first before this class go out of scope.
-    // For now we are alocating the memory and deleting it.
+    // For now we are alocating the memory and NOT deleting it.
 
     auto fname = ctx->name->getText();
 
@@ -117,18 +117,18 @@ antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefSt
 
     for (int c = first_param_index; c < last_param_index; c += 2)
     {
-        auto ptype = llvm::Type::getInt32Ty(*context_);
+        auto ptype = llvm::Type::getInt64Ty(*context_);
         param_names.push_back(ctx->children[c]->getText());
         parameters.push_back(ptype);
     }
 
-    auto intType = llvm::Type::getInt32Ty(*context_);
+    auto intType = llvm::Type::getInt64Ty(*context_);
     auto funPrototype = llvm::FunctionType::get(intType, parameters, false);
     fun_ = llvm::Function::Create(funPrototype, llvm::Function::ExternalLinkage, fname, module_);
 
     // Set parameter names
     int i = 0;
-    for (llvm::Function::arg_iterator a = fun_->arg_begin(), ae = fun_->arg_end(); a != ae; ++a, i++)    
+    for (llvm::Function::arg_iterator a = fun_->arg_begin(), ae = fun_->arg_end(); a != ae; ++a, ++i)
     {
         a->setName(param_names[i]);
     }
@@ -140,12 +140,50 @@ antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefSt
     llvm::IRBuilder<> builder(block_temp);
     builder_ = &builder;
 
-    return visit(ctx->blk);
+    auto ret = visit(ctx->blk);
 
     builder_ = nullptr;
-    delete block_temp;
-    delete fun_;
+    //delete block_temp;
+    //delete fun_;
     fun_ = nullptr;
+
+    return ret;
+}
+
+antlrcpp::Any visitor_impl::visitFunctionCallExpression(grootParser::FunctionCallExpressionContext *ctx)
+{
+    auto functionName = ctx->name->getText();
+
+    std::vector<llvm::Value *> parameters;
+    std::vector<llvm::Type *> parameter_types;
+
+    int parts = ctx->children.size();
+    auto first_param_index = 2;
+    auto last_param_index = parts - 1;
+
+    auto ptype = llvm::Type::getInt64Ty(*context_);
+
+    for (int c = first_param_index; c < last_param_index; c += 2)
+    {
+        // std::cout << ctx->children[c]->getText() << std::endl;
+        auto value = visit(ctx->children[c]);
+        if (value.is<llvm::Value *>())
+        {
+            parameters.push_back(value.as<llvm::Value *>());
+        }
+        else
+        {
+            std::cerr << "Wrong parameter type calling function " << functionName << std::endl;
+        }
+
+        parameter_types.push_back(ptype);
+    }
+
+    auto ft = llvm::FunctionType::get(ptype, parameter_types, false);
+
+    llvm::FunctionCallee calle = module_->getOrInsertFunction(functionName, ft);
+    llvm::Value *retVal = builder_->CreateCall(calle, parameters, functionName);
+    return retVal;
 }
 
 // Helper functions

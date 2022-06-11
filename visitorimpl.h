@@ -22,6 +22,7 @@ public:
     antlrcpp::Any visitVariableValueExpression(grootParser::VariableValueExpressionContext *ctx) override;
 
     antlrcpp::Any visitFunctionDefStatement(grootParser::FunctionDefStatementContext *ctx) override;
+    antlrcpp::Any visitFunctionCallExpression(grootParser::FunctionCallExpressionContext *ctx) override;
 
 protected:
     llvm::AllocaInst* allocateVariable(const std::string &VarName, llvm::Type *varType);
@@ -32,6 +33,7 @@ private:
     llvm::Function *fun_;
 
     std::map<std::string, llvm::AllocaInst*> scope_;
+    std::map<std::string, llvm::FunctionCallee> scope_fn_callee_; //TODO: create a scope class instead
     
     llvm::Module *module_;
 };

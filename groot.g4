@@ -12,11 +12,12 @@ functionDefStatement: 'function' name=IDENTIFIER '(' (IDENTIFIER (',' IDENTIFIER
 
 block: '{' (statement)* '}';
 
-expression: left=expression op=('*' | '/') right=expression         #mulDivExpression
-            | left=expression op=('+' | '-') right=expression       #addSubExpression
-            | atom=INT                                              #primitiveExpression
-            | var_name=IDENTIFIER '=' expr=expression               #variableAssignment
-            | name=IDENTIFIER                                       #variableValueExpression
+expression: left=expression op=('*' | '/') right=expression             #mulDivExpression
+            | left=expression op=('+' | '-') right=expression           #addSubExpression
+            | atom=INT                                                  #primitiveExpression
+            | var_name=IDENTIFIER '=' expr=expression                   #variableAssignment
+            | name=IDENTIFIER                                           #variableValueExpression
+            | name=IDENTIFIER '(' (expression (',' expression)*)? ')'   #functionCallExpression
             ;
 
 IDENTIFIER: [a-zA-Z_] [a-zA-Z_0-9]*;
