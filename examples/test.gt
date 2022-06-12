@@ -1,12 +1,13 @@
 function add(x, y)
 {
-    return 10;
+    z = x + y;
+    return z;
 }
 
 function main(argc, argv)
 {
     x = 523-234+11-100*2/10;
-    y = x + 1;
+    y = x + 11;
     z = add(x,y);
     return z;
 }

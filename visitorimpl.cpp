@@ -87,7 +87,6 @@ antlrcpp::Any visitor_impl::visitVariableAssignment(grootParser::VariableAssignm
     scope_[varName] = alloca;
 
     return (llvm::StoreInst *)builder_->CreateStore(val, alloca, false);
-    // return builder_->CreateLoad(val->getType(), alloca, varName.c_str());
 }
 
 antlrcpp::Any visitor_impl::visitVariableValueExpression(grootParser::VariableValueExpressionContext *ctx)
@@ -126,19 +125,29 @@ antlrcpp::Any visitor_impl::visitFunctionDefStatement(grootParser::FunctionDefSt
     auto funPrototype = llvm::FunctionType::get(intType, parameters, false);
     fun_ = llvm::Function::Create(funPrototype, llvm::Function::ExternalLinkage, fname, module_);
 
-    // Set parameter names
-    int i = 0;
-    for (llvm::Function::arg_iterator a = fun_->arg_begin(), ae = fun_->arg_end(); a != ae; ++a, ++i)
-    {
-        a->setName(param_names[i]);
-    }
-
     // 4. Create function body block structure
-    auto block_temp = llvm::BasicBlock::Create(*context_, fname + "Block", fun_);
+    auto block_temp = llvm::BasicBlock::Create(*context_, fname + "_entry", fun_);
 
     // 5. Create instructions for the block
     llvm::IRBuilder<> builder(block_temp);
     builder_ = &builder;
+
+    // Set parameter names
+    int i = 0;
+    for (llvm::Function::arg_iterator a = fun_->arg_begin(), ae = fun_->arg_end(); a != ae; ++a, ++i)
+    {
+        auto varName = param_names[i];
+        a->setName(varName);
+
+        auto val = a;
+        auto varType = llvm::Type::getInt64Ty(*context_);
+        auto alloca = allocateVariable(varName, varType);
+
+        scope_[varName] = alloca;
+
+        builder_->CreateStore(val, alloca, false);
+    }
+
 
     auto ret = visit(ctx->blk);
 
